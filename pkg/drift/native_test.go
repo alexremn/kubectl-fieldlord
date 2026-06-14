@@ -61,3 +61,28 @@ func TestNative_NoApplyManager_Errors(t *testing.T) {
 		t.Errorf("expected error when no Apply manager exists and --expect-manager is unset")
 	}
 }
+
+func TestNative_InferPrimary_MostLeavesWins(t *testing.T) {
+	// helm owns 2 leaves, argocd owns 1 -> helm wins on count regardless of order.
+	m := ownership.Model{Paths: []ownership.OwnedPath{
+		{Path: ".spec.a", Owners: []ownership.Owner{own("helm", ownership.OperationApply, "", "")}},
+		{Path: ".spec.b", Owners: []ownership.Owner{own("helm", ownership.OperationApply, "", "")}},
+		{Path: ".spec.c", Owners: []ownership.Owner{own("argocd", ownership.OperationApply, "", "")}},
+	}}
+	primary, ok := inferPrimary(m)
+	if !ok || primary != "helm" {
+		t.Errorf("inferPrimary = %q,%v; want helm,true (2 leaves > 1)", primary, ok)
+	}
+}
+
+func TestNative_InferPrimary_NameTieBreak(t *testing.T) {
+	// equal count, equal (empty) time -> lexicographically smallest name wins.
+	m := ownership.Model{Paths: []ownership.OwnedPath{
+		{Path: ".spec.a", Owners: []ownership.Owner{own("zeta", ownership.OperationApply, "", "")}},
+		{Path: ".spec.b", Owners: []ownership.Owner{own("alpha", ownership.OperationApply, "", "")}},
+	}}
+	primary, ok := inferPrimary(m)
+	if !ok || primary != "alpha" {
+		t.Errorf("inferPrimary = %q,%v; want alpha,true (name tie-break)", primary, ok)
+	}
+}
