@@ -59,3 +59,39 @@ func TestExplainTable_NoColorPlain(t *testing.T) {
 		}
 	}
 }
+
+func TestColorizeManager(t *testing.T) {
+	if got := colorizeManager("helm", false); got != "helm" {
+		t.Errorf("color off must return the plain name, got %q", got)
+	}
+	if got := colorizeManager("", true); got != "" {
+		t.Errorf("empty name must stay empty, got %q", got)
+	}
+	colored := colorizeManager("helm", true)
+	if !strings.HasPrefix(colored, "\x1b[") || !strings.Contains(colored, "helm") || !strings.HasSuffix(colored, "\x1b[0m") {
+		t.Errorf("color on must wrap the name in ANSI escapes, got %q", colored)
+	}
+}
+
+func TestDriftTable_NoColorPlain(t *testing.T) {
+	rows := []DriftRow{
+		{
+			Path: ".spec.replicas", ExpectedManager: "helm", Attributed: true,
+			ActualOwner: &ownership.Owner{Manager: "hpa", Operation: ownership.OperationUpdate},
+		},
+		{Path: ".spec.foo", ExpectedManager: "helm", Attributed: false, ActualOwner: nil},
+	}
+	var out bytes.Buffer
+	if err := DriftTable(&out, rows, true); err != nil {
+		t.Fatal(err)
+	}
+	s := out.String()
+	if strings.Contains(s, "\x1b[") {
+		t.Errorf("no-color drift table must not contain ANSI escapes: %q", s)
+	}
+	for _, want := range []string{"FIELD", "EXPECTED", "ACTUAL-MANAGER", "ATTRIBUTED", ".spec.replicas", "hpa", "Update", "true", "false"} {
+		if !strings.Contains(s, want) {
+			t.Errorf("drift table missing %q:\n%s", want, s)
+		}
+	}
+}
