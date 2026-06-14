@@ -63,3 +63,26 @@ func DriftTable(w io.Writer, findings []DriftRow, noColor bool) error {
 	}
 	return tw.Flush()
 }
+
+// PredictRow is one predicted clobber for table rendering.
+type PredictRow struct {
+	Field     string
+	Manager   string
+	Operation string
+}
+
+// PredictTable writes the predicted clobber set: which fields a forced apply would
+// overwrite and which manager+operation currently owns each.
+func PredictTable(w io.Writer, rows []PredictRow, noColor bool) error {
+	on := useColor(noColor, isTerminal(w))
+	tw := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
+	if _, err := fmt.Fprintln(tw, "FIELD\tCLOBBERS-MANAGER\tOPERATION"); err != nil {
+		return err
+	}
+	for _, r := range rows {
+		if _, err := fmt.Fprintf(tw, "%s\t%s\t%s\n", r.Field, colorizeManager(r.Manager, on), r.Operation); err != nil {
+			return err
+		}
+	}
+	return tw.Flush()
+}
