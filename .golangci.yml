@@ -1,0 +1,56 @@
+version: "2"
+run:
+  timeout: 5m
+linters:
+  default: standard
+  enable:
+    - gocritic
+    - revive
+    - bodyclose
+    - errorlint
+    - gosec
+    - misspell
+    - unconvert
+    - unparam
+    - nilerr
+    - prealloc
+    - copyloopvar
+    - nolintlint
+  settings:
+    govet:
+      enable-all: true
+      disable: [fieldalignment]
+    revive:
+      rules:
+        - {name: exported}
+        - {name: var-naming}
+        - {name: error-return}
+        - {name: error-strings}
+        - {name: indent-error-flow}
+        - {name: context-as-argument}
+    gocritic:
+      enabled-tags: [diagnostic, performance, style]
+      disabled-checks: [whyNoLint]
+    staticcheck:
+      checks: [all]
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+      allow-unused: false
+  exclusions:
+    generated: lax
+    presets: [comments, common-false-positives, legacy, std-error-handling]
+    rules:
+      - path: _test\.go
+        linters: [errcheck, gosec, unparam]
+    paths: [third_party$, builtin$, examples$]
+formatters:
+  enable: [gofmt, goimports]
+  settings:
+    goimports:
+      local-prefixes: [github.com/alexremn/kubectl-fieldlord]
+  exclusions:
+    generated: lax
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

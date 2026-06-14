@@ -1,0 +1,10 @@
+kubectl-fieldlord
+Copyright 2026 Aleksei Remniov
+
+This product includes software developed at the Kubernetes project
+(https://github.com/kubernetes/kubernetes) and SIG API Machinery
+(https://github.com/kubernetes-sigs/structured-merge-diff), licensed under
+the Apache License, Version 2.0.
+
+The CLI skeleton is adapted from kubernetes/sample-cli-plugin (Apache-2.0).
+Field-set decoding uses sigs.k8s.io/structured-merge-diff (Apache-2.0).
