@@ -41,8 +41,3 @@ func NewRootCmd(streams genericiooptions.IOStreams) *cobra.Command {
 	// cobra auto-adds `completion` via ExecuteC(); do NOT add it here.
 	return root
 }
-
-// TEMP STUB — deleted in Task 11.
-func newDriftCmd(_ *genericclioptions.ConfigFlags, _ *globalOptions, _ genericiooptions.IOStreams) *cobra.Command {
-	return &cobra.Command{Use: "drift"}
-}
