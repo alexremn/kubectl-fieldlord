@@ -1,0 +1,51 @@
+[
+  {
+    "path": ".spec.replicas",
+    "atomic": false,
+    "multiOwner": false,
+    "owners": [
+      {
+        "manager": "kube-controller-manager",
+        "operation": "Update",
+        "apiVersion": "autoscaling/v2"
+      }
+    ]
+  },
+  {
+    "path": ".spec.template.spec.containers[name=\"app\"].image",
+    "atomic": false,
+    "multiOwner": false,
+    "owners": [
+      {
+        "manager": "helm",
+        "operation": "Apply",
+        "apiVersion": "apps/v1"
+      }
+    ]
+  },
+  {
+    "path": ".spec.template.spec.containers[name=\"app\"].name",
+    "atomic": false,
+    "multiOwner": false,
+    "owners": [
+      {
+        "manager": "helm",
+        "operation": "Apply",
+        "apiVersion": "apps/v1"
+      }
+    ]
+  },
+  {
+    "path": ".status.conditions[0].type",
+    "atomic": true,
+    "multiOwner": false,
+    "owners": [
+      {
+        "manager": "kubelet",
+        "operation": "Update",
+        "apiVersion": "apps/v1",
+        "subresource": "status"
+      }
+    ]
+  }
+]

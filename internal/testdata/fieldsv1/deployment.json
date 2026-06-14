@@ -1,0 +1,34 @@
+[
+  {
+    "manager": "helm",
+    "operation": "Apply",
+    "apiVersion": "apps/v1",
+    "fieldsType": "FieldsV1",
+    "fieldsV1": {
+      "f:spec": {
+        "f:template": {
+          "f:spec": {
+            "f:containers": {
+              "k:{\"name\":\"app\"}": { "f:image": {}, "f:name": {} }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "manager": "kube-controller-manager",
+    "operation": "Update",
+    "apiVersion": "autoscaling/v2",
+    "fieldsType": "FieldsV1",
+    "fieldsV1": { "f:spec": { "f:replicas": {} } }
+  },
+  {
+    "manager": "kubelet",
+    "operation": "Update",
+    "apiVersion": "apps/v1",
+    "subresource": "status",
+    "fieldsType": "FieldsV1",
+    "fieldsV1": { "f:status": { "f:conditions": { "i:0": { "f:type": {} } } } }
+  }
+]
