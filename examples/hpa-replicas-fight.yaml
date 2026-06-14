@@ -1,0 +1,53 @@
+# replicas-fight: classic HPA vs. Deployment ownership conflict
+#
+# When an HPA targets a Deployment, the HPA controller takes over
+# spec.replicas and rewrites it on every reconcile loop.  Any tool
+# (Helm, kubectl apply, Argo CD, etc.) that also writes spec.replicas
+# will be in a constant tug-of-war with the HPA — a classic
+# "field ownership fight".
+#
+# Apply this manifest with a known field manager, wait a few seconds
+# for the HPA to run its first reconcile, then use kubectl-fieldlord
+# to see who owns spec.replicas.  See examples/README.md for the
+# full walkthrough.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: replicas-fight
+  labels:
+    app: replicas-fight
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: replicas-fight
+  template:
+    metadata:
+      labels:
+        app: replicas-fight
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:stable-alpine
+          ports:
+            - containerPort: 80
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: replicas-fight
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: replicas-fight
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50
