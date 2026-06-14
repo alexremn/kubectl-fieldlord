@@ -4,7 +4,13 @@ import (
 	"fmt"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/resource"
 )
+
+// resolveFunc resolves kubectl-style resource refs to objects. It is a field on
+// cmdOptions (defaulting to kube.Resolve) so commands can be unit-tested with a
+// fake that returns canned objects instead of hitting a live cluster.
+type resolveFunc func(getter resource.RESTClientGetter, namespace string, args []string) ([]*resource.Info, error)
 
 // cmdOptions holds per-command state shared by explain and drift.
 type cmdOptions struct {
@@ -12,6 +18,7 @@ type cmdOptions struct {
 	g           *globalOptions
 	namespace   string
 	args        []string
+	resolve     resolveFunc
 }
 
 func validateOutput(o string) error {

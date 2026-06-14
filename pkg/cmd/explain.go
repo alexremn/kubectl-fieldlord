@@ -20,7 +20,7 @@ func schemaGVK(g, v, k string) schema.GroupVersionKind {
 }
 
 func newExplainCmd(cf *genericclioptions.ConfigFlags, g *globalOptions, streams genericiooptions.IOStreams) *cobra.Command {
-	o := &cmdOptions{configFlags: cf, g: g}
+	o := &cmdOptions{configFlags: cf, g: g, resolve: kube.Resolve}
 	return &cobra.Command{
 		Use:           "explain <resource>...",
 		Aliases:       []string{"own", "who"},
@@ -46,7 +46,7 @@ func newExplainCmd(cf *genericclioptions.ConfigFlags, g *globalOptions, streams 
 
 func runExplain(o *cmdOptions, streams genericiooptions.IOStreams) error {
 	server, tier := probe(o, streams)
-	infos, err := kube.Resolve(o.configFlags, o.namespace, o.args)
+	infos, err := o.resolve(o.configFlags, o.namespace, o.args)
 	if err != nil {
 		return err
 	}
