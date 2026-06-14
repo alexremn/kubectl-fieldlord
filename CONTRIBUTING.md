@@ -20,7 +20,7 @@ Pull requests that contain unsigned commits will not be merged.
 
 ### Prerequisites
 
-- Go 1.24 or later
+- Go 1.26 or later (required by the pinned k8s.io v0.36 dependencies)
 - [golangci-lint](https://golangci-lint.run/) v2 (`brew install golangci-lint` or see upstream install docs)
 - `setup-envtest` for the integration test lane (see below)
 

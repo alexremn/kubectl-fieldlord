@@ -20,7 +20,7 @@ Make Kubernetes Server-Side Apply field ownership legible.
 
 ### From source (v0.1)
 
-Requires Go 1.24 or later.
+Requires Go 1.26 or later (the pinned `k8s.io` v0.36 libraries require it).
 
 ```bash
 go install github.com/alexremn/kubectl-fieldlord/cmd/kubectl-fieldlord@latest
