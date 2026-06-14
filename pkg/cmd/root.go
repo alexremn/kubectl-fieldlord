@@ -29,6 +29,10 @@ func NewRootCmd(streams genericiooptions.IOStreams) *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
+	// Route cobra's own output (version, help) through the injected streams so
+	// every command honors the same IOStreams the subcommands write to.
+	root.SetOut(streams.Out)
+	root.SetErr(streams.ErrOut)
 	pf := root.PersistentFlags()
 	configFlags.AddFlags(pf)
 	pf.StringVarP(&g.output, "output", "o", "table", "Output format: table|json|yaml")
