@@ -9,7 +9,7 @@ import (
 	"github.com/alexremn/kubectl-fieldlord/pkg/ownership"
 )
 
-func os_unsetNoColor(t *testing.T) {
+func osUnsetNoColor(t *testing.T) {
 	t.Helper()
 	old, had := os.LookupEnv("NO_COLOR")
 	_ = os.Unsetenv("NO_COLOR")
@@ -26,7 +26,7 @@ func TestUseColor(t *testing.T) {
 }
 
 func TestUseColor_Matrix(t *testing.T) {
-	os_unsetNoColor(t)
+	osUnsetNoColor(t)
 	if useColor(true, true) {
 		t.Errorf("--no-color must disable")
 	}

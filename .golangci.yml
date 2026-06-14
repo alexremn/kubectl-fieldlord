@@ -19,7 +19,9 @@ linters:
   settings:
     govet:
       enable-all: true
-      disable: [fieldalignment]
+      # fieldalignment: memory-layout micro-opt, noisy. shadow: flags idiomatic
+      # `if err := ...; err != nil` redeclarations that are not real bugs.
+      disable: [fieldalignment, shadow]
     revive:
       rules:
         - {name: exported}
@@ -30,7 +32,9 @@ linters:
         - {name: context-as-argument}
     gocritic:
       enabled-tags: [diagnostic, performance, style]
-      disabled-checks: [whyNoLint]
+      # hugeParam: passing k8s API structs by value is idiomatic (they arrive by
+      # value from range over slices); pointer churn is not worth it.
+      disabled-checks: [whyNoLint, hugeParam]
     staticcheck:
       checks: [all]
     nolintlint:

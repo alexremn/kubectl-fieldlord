@@ -1,6 +1,7 @@
 package ownership
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"os"
@@ -35,7 +36,7 @@ func TestBuild_Golden(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read golden (run with -update to create): %v", err)
 	}
-	if string(got) != string(want) {
+	if !bytes.Equal(got, want) {
 		t.Errorf("golden mismatch; run `go test ./pkg/ownership -run Golden -update`\n got: %s", got)
 	}
 }
