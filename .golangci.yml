@@ -47,6 +47,10 @@ linters:
     rules:
       - path: _test\.go
         linters: [errcheck, gosec, unparam]
+      # readManifest: path is an operator-supplied -f flag value, not user input (G304)
+      - path: pkg/cmd/predict\.go
+        linters: [gosec]
+        text: "G304"
     paths: [third_party$, builtin$, examples$]
 formatters:
   enable: [gofmt, goimports]

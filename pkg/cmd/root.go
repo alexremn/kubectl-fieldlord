@@ -42,6 +42,7 @@ func NewRootCmd(streams genericiooptions.IOStreams) *cobra.Command {
 	root.AddCommand(newVersionCmd())
 	root.AddCommand(newExplainCmd(configFlags, g, streams))
 	root.AddCommand(newDriftCmd(configFlags, g, streams))
+	root.AddCommand(newPredictCmd(configFlags, g, streams))
 	// cobra auto-adds `completion` via ExecuteC(); do NOT add it here.
 	return root
 }
