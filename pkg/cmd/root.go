@@ -42,11 +42,6 @@ func NewRootCmd(streams genericiooptions.IOStreams) *cobra.Command {
 	return root
 }
 
-// TEMP STUB — deleted in Task 10.
-func newExplainCmd(_ *genericclioptions.ConfigFlags, _ *globalOptions, _ genericiooptions.IOStreams) *cobra.Command {
-	return &cobra.Command{Use: "explain"}
-}
-
 // TEMP STUB — deleted in Task 11.
 func newDriftCmd(_ *genericclioptions.ConfigFlags, _ *globalOptions, _ genericiooptions.IOStreams) *cobra.Command {
 	return &cobra.Command{Use: "drift"}
