@@ -1,6 +1,8 @@
 name: ci
 on:
   pull_request:
+  workflow_call:     # reusable: release.yml calls this so a release gates on tests
+  workflow_dispatch: # manual trigger from the Actions tab
 jobs:
   build-test:
     runs-on: ubuntu-latest

@@ -3,12 +3,20 @@ on:
   push:
     tags: ['v*']
 permissions:
-  contents: write
-  id-token: write
-  attestations: write
+  contents: read
 jobs:
+  # Gate the release on the full CI suite (build, vet, test+coverage, lint) by
+  # calling the reusable ci workflow. release runs only if this passes.
+  ci:
+    uses: ./.github/workflows/ci.yml
+
   release:
+    needs: ci
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@v6
         with:
