@@ -8,6 +8,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/typed"
 
 	"github.com/alexremn/kubectl-fieldlord/pkg/ownership"
 	"github.com/alexremn/kubectl-fieldlord/pkg/predict"
@@ -22,6 +24,11 @@ type resolveFunc func(getter resource.RESTClientGetter, namespace string, args [
 // predictFunc runs the SSA dry-run probe for one object; injectable for tests.
 type predictFunc func(ctx context.Context, info *resource.Info, data []byte, manager string) ([]predict.ConflictPath, error)
 
+// diffFunc computes the typed desired-vs-live comparison; injectable for tests.
+// The default wrapper (realDriftDiff) builds the TypeConverter internally, so this
+// signature is converter-free.
+type diffFunc func(desired, live *unstructured.Unstructured, managerOwned *fieldpath.Set) (*typed.Comparison, bool, error)
+
 // cmdOptions holds per-command state shared by explain, drift, and predict.
 type cmdOptions struct {
 	configFlags *genericclioptions.ConfigFlags
@@ -30,6 +37,7 @@ type cmdOptions struct {
 	args        []string
 	resolve     resolveFunc
 	predict     predictFunc
+	diff        diffFunc
 }
 
 // predictFinding is the spec §9 predict envelope finding.
