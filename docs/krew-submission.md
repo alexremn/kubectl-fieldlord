@@ -1,183 +1,96 @@
-# Krew Submission Runbook
+# Distribution Runbook — krew & Homebrew
 
-This document describes how to submit `kubectl fieldlord` to the
-[krew-index](https://github.com/kubernetes-sigs/krew-index) once v0.2.0 is
-published. It is a manual owner action — nothing here happens automatically.
+`kubectl fieldlord` ships through two channels, both wired into the release
+pipeline. Neither needs a hand-maintained manifest.
 
-> **When to run this:** after the `v0.2.0` tag has been pushed, the GitHub
-> Actions release workflow has completed, and the GitHub Release is public.
+| Channel | Source of truth | Published by | Auth needed |
+|---------|-----------------|--------------|-------------|
+| **krew** | `.krew.yaml` | `.github/workflows/krew.yml` (`rajatjindal/krew-release-bot`) on release publish | none |
+| **Homebrew** | `homebrew_casks:` in `.goreleaser.yaml` | GoReleaser during `release.yml` | `HOMEBREW_TAP_GITHUB_TOKEN` secret |
 
----
-
-## How the manifest is generated (single-sourced)
-
-There is **no hand-written `plugins/fieldlord.yaml`** in this repository.
-The krew manifest is generated automatically by GoReleaser during the release
-workflow, driven by the `krews:` block in `.goreleaser.yaml`:
-
-```yaml
-krews:
-  - name: fieldlord
-    ids: [archives]
-    homepage: https://github.com/alexremn/kubectl-fieldlord
-    short_description: Explain Server-Side Apply field ownership and drift
-    description: |
-      Parse managedFields to explain per-field ownership, attribute drift to a
-      fieldManager, and predict what --force-conflicts would clobber.
-    repository:
-      owner: alexremn
-      name: krew-index
-      branch: kubectl-fieldlord-{{ .Version }}
-      token: '{{ .Env.KREW_INDEX_TOKEN }}'
-      pull_request:
-        enabled: true
-        base:
-          owner: kubernetes-sigs
-          name: krew-index
-          branch: master
-    skip_upload: auto
-```
-
-`metadata.name` is `fieldlord`; users invoke it as `kubectl fieldlord`.
+`metadata.name` is `fieldlord`; users invoke it as `kubectl fieldlord`. The binary
+is `kubectl-fieldlord`.
 
 ---
 
-## Prerequisites (one-time setup)
+## How krew publishing works
 
-Complete these before pushing any release tag. The release workflow will fail
-silently or partially if these are missing.
+There is **no fork and no `KREW_INDEX_TOKEN`**. On a *published* GitHub Release,
+`krew.yml` runs `rajatjindal/krew-release-bot`, which:
 
-### 1. Fork `krew-index`
+1. reads `.krew.yaml`,
+2. fills `{{ .TagName }}` and each archive's `sha256` from the release assets,
+3. opens (or updates) a PR to `kubernetes-sigs/krew-index` via the bot's own
+   hosted backend — no token or fork on our side.
 
-The krew PR workflow pushes a branch to *your* fork, then opens a PR from
-that fork to `kubernetes-sigs/krew-index`. You need a fork at
-`alexremn/krew-index`.
+The archive filenames in `.krew.yaml` are **version-less**
+(`kubectl-fieldlord_<os>_<arch>.tar.gz`, windows `.zip`); the tag lives in the
+release path. This must stay in sync with `archives.name_template` in
+`.goreleaser.yaml`.
 
-```bash
-gh repo fork kubernetes-sigs/krew-index --org alexremn --clone=false
+## How Homebrew publishing works
+
+GoReleaser's `homebrew_casks:` block generates `Casks/kubectl-fieldlord.rb` and
+pushes it to `alexremn/homebrew-tap` on every tagged release, using the
+`HOMEBREW_TAP_GITHUB_TOKEN` secret. Users then:
+
+```sh
+brew install alexremn/tap/kubectl-fieldlord
 ```
 
-Verify: https://github.com/alexremn/krew-index must exist and be a fork of
-`kubernetes-sigs/krew-index`.
-
-### 2. Create a PAT and add the `KREW_INDEX_TOKEN` secret
-
-The GoReleaser `krews:` block uses `KREW_INDEX_TOKEN` to push a branch to
-`alexremn/krew-index` and open the cross-repo PR.
-
-Required PAT scopes for the `alexremn/krew-index` fork:
-- **Contents** — read + write (to push the branch)
-- **Pull requests** — read + write (to open the PR)
-
-Create the PAT at https://github.com/settings/tokens (fine-grained, scoped to
-`alexremn/krew-index`), then add it as a repository secret:
-
-```bash
-gh secret set KREW_INDEX_TOKEN \
-  --repo alexremn/kubectl-fieldlord \
-  --body "<paste-token-here>"
-```
-
-### 3. Ensure the repository is public
-
-krew-index maintainers review submissions from public repositories. The repo
-must be public before the PR is opened, or reviewers cannot inspect the source.
-
-```bash
-gh repo edit alexremn/kubectl-fieldlord --visibility public
-```
-
-### 4. Developer Certificate of Origin (DCO) + Kubernetes CLA
-
-krew-index requires:
-
-- **DCO**: all commits in this repo must be signed off (`git commit -s`).
-  The krew-index CI bot checks commit history of the PR.
-- **Signed Kubernetes CLA**: the submitting GitHub account must have signed the
-  Kubernetes CLA at https://cla.k8s.io. This gate appears on the PR opened by
-  GoReleaser.
+The cask installs the `kubectl-fieldlord` binary on `PATH` and strips the macOS
+quarantine xattr so it runs without a Gatekeeper prompt.
 
 ---
 
-## Local pre-tag validation
+## One-time prerequisites
 
-Before pushing the release tag, validate the release locally. This catches
-manifest generation errors and bad archive paths before they reach CI.
+1. **Repository public** — krew-index review and the bot both need a public repo:
+   `gh repo edit alexremn/kubectl-fieldlord --visibility public`.
+2. **`HOMEBREW_TAP_GITHUB_TOKEN` secret** — a PAT with **Contents: read+write** on
+   `alexremn/homebrew-tap`:
+   `gh secret set HOMEBREW_TAP_GITHUB_TOKEN --repo alexremn/kubectl-fieldlord --body "<token>"`.
+   (The `alexremn/homebrew-tap` repo already exists.)
+3. **Kubernetes CLA** — the krew-index PR runs the CNCF EasyCLA check. Sign at
+   <https://cla.k8s.io> if prompted on the PR.
 
-### Step 1 — snapshot build
+---
 
-```bash
-go run github.com/goreleaser/goreleaser/v2@latest release --snapshot --clean
+## Local validation (before tagging)
+
+```sh
+make third-party-licenses    # the release archives include this file
+go run github.com/goreleaser/goreleaser/v2@latest release --snapshot --clean --skip=publish,sign,sbom
+ls dist/*.tar.gz dist/*.zip  # names must match the URLs in .krew.yaml
 ```
 
-This produces `dist/` with archives and a generated krew manifest (e.g.
-`dist/fieldlord.yaml`). No tag is needed; no artifacts are published.
+Confirm the generated cask renders at `dist/homebrew/Casks/kubectl-fieldlord.rb`.
+Optionally lint the krew manifest's static shape (note: `validate-krew-manifest`
+does not evaluate the `krew-release-bot` template directives, so validate a
+rendered copy or rely on the bot's PR CI):
 
-### Step 2 — install the snapshot locally
-
-```bash
-# Find the generated manifest and a local archive
-MANIFEST=$(ls dist/fieldlord*.yaml | head -1)
-ARCHIVE=$(ls dist/kubectl-fieldlord_*_linux_amd64.tar.gz | head -1)  # adjust OS/arch
-
-kubectl krew install --manifest="$MANIFEST" --archive="$ARCHIVE"
-kubectl fieldlord --version
-kubectl fieldlord explain deploy/<any-deploy-in-your-cluster>
-```
-
-Confirm the binary runs and the output is correct.
-
-### Step 3 — validate the manifest
-
-Pin the validator to a known-good version:
-
-```bash
+```sh
 go install sigs.k8s.io/krew/cmd/validate-krew-manifest@v0.4.5
-validate-krew-manifest -manifest "$MANIFEST"
 ```
-
-The command must exit `0` with no errors before proceeding.
 
 ---
 
-## Releasing (tag → PR)
+## Release flow (tag → publish → PRs)
 
-Once prerequisites are satisfied and local validation passes:
-
-```bash
-git tag v0.2.0
-git push origin v0.2.0
+```sh
+git tag -a v0.1.0 -m "kubectl-fieldlord v0.1.0"
+git push origin v0.1.0
 ```
 
-The `.github/workflows/release.yml` workflow triggers on the `v0.2.0` tag:
-
-1. GoReleaser builds archives for all platforms (linux/darwin/windows ×
-   amd64/arm64).
-2. Generates the krew manifest from `.goreleaser.yaml`'s `krews:` block.
-3. Cosign signs `checksums.txt` (keyless, Sigstore bundle).
-4. Syft generates SPDX + CycloneDX SBOMs per archive.
-5. GoReleaser pushes branch `kubectl-fieldlord-v0.2.0` to
-   `alexremn/krew-index` and opens a PR against
-   `kubernetes-sigs/krew-index` (`master`).
-6. The GitHub Release is created (tagged as prerelease until manually
-   promoted, per `release.prerelease: auto`).
-
----
-
-## krew-index PR review
-
-After the workflow completes:
-
-1. Verify the PR appeared at https://github.com/kubernetes-sigs/krew-index/pulls.
-2. The PR description is auto-populated by GoReleaser. Add context about the
-   plugin if requested by a reviewer.
-3. krew-index maintainers perform a human review — typical turnaround is days
-   to a few weeks. Watch the PR for review comments and respond promptly.
-4. Once merged and the krew-index build propagates, users can install with:
-
-```bash
-kubectl krew install fieldlord
-```
+1. `release.yml` runs the reusable `ci` workflow (build/test/lint) as a gate.
+2. GoReleaser builds all platforms, signs `checksums.txt` (cosign keyless),
+   generates SBOMs, pushes the Homebrew cask to `alexremn/homebrew-tap`, and
+   creates a **draft** GitHub Release (`release.draft: true`).
+3. SLSA build provenance is attested over `checksums.txt`.
+4. **You review the draft release notes and click *Publish*.**
+5. Publishing fires `krew.yml` → `krew-release-bot` opens the krew-index PR.
+6. A krew maintainer reviews; respond to EasyCLA / review comments.
+7. After merge: `kubectl krew update && kubectl krew install fieldlord`.
 
 ---
 
@@ -185,18 +98,16 @@ kubectl krew install fieldlord
 
 | Symptom | Likely cause | Fix |
 |---------|-------------|-----|
-| `KREW_INDEX_TOKEN` error in CI | Secret missing or expired PAT | Re-create PAT, update secret |
-| GoReleaser fails to push branch | Fork `alexremn/krew-index` does not exist | Create the fork (Step 1) |
-| `validate-krew-manifest` errors | Archive name template mismatch | Check `archives.name_template` in `.goreleaser.yaml` |
-| CLA bot blocks PR | CLA not signed | Sign at https://cla.k8s.io |
-| DCO bot blocks PR | Commits lack `Signed-off-by` | Rewrite commits with `git rebase --signoff` |
-| PR not opened | `skip_upload: auto` + non-tag build | Only tag builds trigger the upload; snapshot skips it by design |
+| Homebrew cask not pushed | `HOMEBREW_TAP_GITHUB_TOKEN` missing/expired | Re-create PAT, update the secret |
+| krew PR never opens | Release left as draft | Publish the GitHub Release (step 4) |
+| `validate-krew-manifest` errors on `.krew.yaml` | It can't read `krew-release-bot` template directives | Validate a rendered manifest, or trust the bot's PR CI |
+| krew archive 404 | `.krew.yaml` filename ≠ `archives.name_template` | Keep both version-less and in sync |
+| CLA bot blocks the krew PR | Kubernetes CLA unsigned | Sign at <https://cla.k8s.io> |
 
 ---
 
 ## References
 
-- krew plugin submission guide: https://krew.sigs.k8s.io/docs/developer-guide/release/
-- krew manifest format: https://krew.sigs.k8s.io/docs/developer-guide/plugin-manifest/
-- validate-krew-manifest: https://github.com/kubernetes-sigs/krew/tree/master/cmd/validate-krew-manifest
-- GoReleaser krew publisher docs: https://goreleaser.com/customization/krew/
+- krew developer guide: <https://krew.sigs.k8s.io/docs/developer-guide/release/>
+- krew-release-bot: <https://github.com/rajatjindal/krew-release-bot>
+- GoReleaser Homebrew casks: <https://goreleaser.com/customization/homebrew_casks/>

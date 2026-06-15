@@ -34,7 +34,9 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          KREW_INDEX_TOKEN: ${{ secrets.KREW_INDEX_TOKEN }}
+          # Lets GoReleaser push the Homebrew formula to alexremn/homebrew-tap.
+          # (krew is handled separately by krew.yml on release publish.)
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
       - uses: actions/attest-build-provenance@v4
         with:
           subject-checksums: ./dist/checksums.txt

@@ -1,0 +1,48 @@
+apiVersion: krew.googlecontainertools.github.com/v1alpha2
+kind: Plugin
+metadata:
+  name: fieldlord
+spec:
+  version: "{{ .TagName }}"
+  homepage: https://github.com/alexremn/kubectl-fieldlord
+  shortDescription: Explain SSA field ownership, drift & clobber
+  description: |
+    Reads managedFields under Server-Side Apply to explain who owns each field,
+    attribute ownership drift to a fieldManager, and predict (via a non-persisting
+    server-side dry-run) exactly what --force-conflicts would clobber. Deterministic,
+    read-mostly, no LLM.
+  caveats: |
+    explain and drift are read-only. predict issues a server-side apply with
+    dryRun=All (never persists) but does invoke admission webhooks — run against a
+    non-production cluster first if their side-effect posture is unknown.
+  platforms:
+  - selector:
+      matchLabels:
+        os: linux
+        arch: amd64
+    {{addURIAndSha "https://github.com/alexremn/kubectl-fieldlord/releases/download/{{ .TagName }}/kubectl-fieldlord_linux_amd64.tar.gz" .TagName }}
+    bin: kubectl-fieldlord
+  - selector:
+      matchLabels:
+        os: linux
+        arch: arm64
+    {{addURIAndSha "https://github.com/alexremn/kubectl-fieldlord/releases/download/{{ .TagName }}/kubectl-fieldlord_linux_arm64.tar.gz" .TagName }}
+    bin: kubectl-fieldlord
+  - selector:
+      matchLabels:
+        os: darwin
+        arch: amd64
+    {{addURIAndSha "https://github.com/alexremn/kubectl-fieldlord/releases/download/{{ .TagName }}/kubectl-fieldlord_darwin_amd64.tar.gz" .TagName }}
+    bin: kubectl-fieldlord
+  - selector:
+      matchLabels:
+        os: darwin
+        arch: arm64
+    {{addURIAndSha "https://github.com/alexremn/kubectl-fieldlord/releases/download/{{ .TagName }}/kubectl-fieldlord_darwin_arm64.tar.gz" .TagName }}
+    bin: kubectl-fieldlord
+  - selector:
+      matchLabels:
+        os: windows
+        arch: amd64
+    {{addURIAndSha "https://github.com/alexremn/kubectl-fieldlord/releases/download/{{ .TagName }}/kubectl-fieldlord_windows_amd64.zip" .TagName }}
+    bin: kubectl-fieldlord.exe

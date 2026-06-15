@@ -17,7 +17,22 @@ Make Kubernetes Server-Side Apply field ownership legible.
 
 ## Install
 
-### From source (v0.1)
+### krew (recommended)
+
+```bash
+kubectl krew install fieldlord
+kubectl fieldlord --version
+```
+_(available once the krew-index PR is accepted — see [docs/krew-submission.md](docs/krew-submission.md))._
+
+### Homebrew
+
+```bash
+brew install alexremn/tap/kubectl-fieldlord
+```
+Installs the `kubectl-fieldlord` binary on your `PATH`, so `kubectl fieldlord` works immediately.
+
+### From source
 
 Requires Go 1.26 or later (the pinned `k8s.io` v0.36 libraries require it).
 
@@ -25,22 +40,9 @@ Requires Go 1.26 or later (the pinned `k8s.io` v0.36 libraries require it).
 go install github.com/alexremn/kubectl-fieldlord/cmd/kubectl-fieldlord@latest
 ```
 
-`go install` builds and places the binary as `kubectl-fieldlord` in `$GOPATH/bin` (or `$GOBIN`). Ensure that directory is on your `PATH`, then `kubectl` will find it as a plugin:
+`go install` places the binary as `kubectl-fieldlord` in `$GOPATH/bin` (or `$GOBIN`); put that on your `PATH` and `kubectl` finds it as a plugin.
 
-```bash
-kubectl fieldlord --version
-```
-
-### krew
-
-Once v0.2.0 is published and the krew-index PR is accepted:
-
-```bash
-kubectl krew install fieldlord
-kubectl fieldlord --version
-```
-
-See [docs/krew-submission.md](docs/krew-submission.md) for the owner runbook.
+You can also grab a static binary from the [release assets](https://github.com/alexremn/kubectl-fieldlord/releases) — rename it to `kubectl-fieldlord`, `chmod +x`, and put it on `PATH`.
 
 ---
 

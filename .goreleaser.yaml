@@ -24,7 +24,9 @@ builds:
 archives:
   - id: archives
     formats: [tar.gz]
-    name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+    # Version-less names so .krew.yaml download URLs are stable (the tag lives in
+    # the release path, not the filename). krew-release-bot fills the sha256.
+    name_template: '{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}'
     format_overrides:
       - goos: windows
         formats: [zip]
@@ -55,30 +57,59 @@ signs:
     args: ['sign-blob', '--yes', '--bundle=${signature}', '${artifact}']
     output: true
 
-krews:
-  - name: fieldlord
-    ids: [archives]
-    homepage: https://github.com/alexremn/kubectl-fieldlord
-    short_description: Explain Server-Side Apply field ownership and drift
-    description: |
-      Parse managedFields to explain per-field ownership, attribute drift to a
-      fieldManager, and predict what --force-conflicts would clobber.
+# Homebrew tap. GoReleaser generates Casks/kubectl-fieldlord.rb in
+# alexremn/homebrew-tap on each tagged release -> `brew install
+# alexremn/tap/kubectl-fieldlord`. (homebrew_casks, not the deprecated `brews`,
+# is the current path for pre-built CLI binaries.) krew is handled separately by
+# .krew.yaml + .github/workflows/krew.yml (krew-release-bot), NOT here.
+homebrew_casks:
+  - name: kubectl-fieldlord
     repository:
       owner: alexremn
-      name: krew-index
-      branch: kubectl-fieldlord-{{ .Version }}
-      token: '{{ .Env.KREW_INDEX_TOKEN }}'
-      pull_request:
-        enabled: true
-        base:
-          owner: kubernetes-sigs
-          name: krew-index
-          branch: master
-    skip_upload: auto
+      name: homebrew-tap
+      token: '{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}'
+    homepage: https://github.com/alexremn/kubectl-fieldlord
+    description: Explain Server-Side Apply field ownership, drift, and clobber risk
+    commit_author:
+      name: goreleaser-bot
+      email: goreleaser@users.noreply.github.com
+    # Strip the macOS quarantine xattr so the unsigned binary runs without a
+    # right-click-open prompt.
+    hooks:
+      post:
+        install: |
+          if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/kubectl-fieldlord"]
+          end
+    caveats: |
+      Installed as a kubectl plugin on your PATH:
+        kubectl fieldlord explain <resource>
 
 release:
-  prerelease: auto
+  # Draft first so you can review the notes; publishing the release then fires
+  # .github/workflows/krew.yml (krew-release-bot) to open the krew-index PR.
+  draft: true
+  header: |
+    Make Kubernetes Server-Side Apply field ownership legible — straight from `kubectl`.
+
+    ### Highlights
+    - 🔎 **`explain`** — per-field ownership table from `managedFields` (who owns each field, which operation, which manager).
+    - 🧭 **`drift`** — attribute ownership drift to a `fieldManager`; `-f desired.yaml` diffs a manifest against live state with full attribution.
+    - 💥 **`predict`** — server-side dry-run that shows exactly what `--force-conflicts` would clobber, and who owns it.
+    - 🔒 **Read-mostly & honest** — `explain`/`drift` are pure reads; `predict` is a non-persisting dry-run. No telemetry, no LLM.
+
+    ### Install
+    ```sh
+    # Homebrew
+    brew install alexremn/tap/kubectl-fieldlord
+    # krew (once accepted into krew-index)
+    kubectl krew install fieldlord
+    ```
+    Or grab a static binary from the assets below (rename to `kubectl-fieldlord`, put on `PATH`).
+
+    ---
 
 changelog:
-  use: github
-  sort: asc
+  # GitHub-rendered notes grouped by PR label (.github/release.yml). No raw
+  # commit SHAs; the curated header above is the real summary.
+  use: github-native
