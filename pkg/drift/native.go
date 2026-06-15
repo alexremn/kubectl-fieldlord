@@ -8,12 +8,24 @@ import (
 	"github.com/alexremn/kubectl-fieldlord/pkg/ownership"
 )
 
+// Change is the kind of difference a manifest-mode finding represents.
+type Change string
+
+const (
+	ChangeModified Change = "modified"
+	ChangeAdded    Change = "added"
+	ChangeRemoved  Change = "removed"
+)
+
 // Finding is one drifted field: owned by a manager other than the expected one.
 type Finding struct {
 	Path            string           `json:"path"`
 	ExpectedManager string           `json:"expectedManager,omitempty"`
 	Attributed      bool             `json:"attributed"`
 	ActualOwner     *ownership.Owner `json:"actualOwner,omitempty"`
+	Change          Change           `json:"change,omitempty"`
+	Conflict        bool             `json:"conflict,omitempty"`
+	Granularity     string           `json:"granularity,omitempty"`
 }
 
 // Native reports main-resource fields whose owner differs from the expected
