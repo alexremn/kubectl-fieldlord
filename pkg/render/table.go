@@ -40,6 +40,7 @@ func ExplainTable(w io.Writer, m ownership.Model, noColor bool) error {
 type DriftRow struct {
 	Path            string
 	ExpectedManager string
+	Change          string // manifest diff summary; blank for native-mode rows
 	Attributed      bool
 	ActualOwner     *ownership.Owner
 }
@@ -48,7 +49,7 @@ type DriftRow struct {
 func DriftTable(w io.Writer, findings []DriftRow, noColor bool) error {
 	on := useColor(noColor, isTerminal(w))
 	tw := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
-	if _, err := fmt.Fprintln(tw, "FIELD\tEXPECTED\tACTUAL-MANAGER\tOPERATION\tATTRIBUTED"); err != nil {
+	if _, err := fmt.Fprintln(tw, "FIELD\tEXPECTED\tACTUAL-MANAGER\tOPERATION\tCHANGE\tATTRIBUTED"); err != nil {
 		return err
 	}
 	for _, f := range findings {
@@ -56,8 +57,8 @@ func DriftTable(w io.Writer, findings []DriftRow, noColor bool) error {
 		if f.ActualOwner != nil {
 			mgr, op = colorizeManager(f.ActualOwner.Manager, on), string(f.ActualOwner.Operation)
 		}
-		if _, err := fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%t\n",
-			f.Path, colorizeManager(f.ExpectedManager, on), mgr, op, f.Attributed); err != nil {
+		if _, err := fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%t\n",
+			f.Path, colorizeManager(f.ExpectedManager, on), mgr, op, f.Change, f.Attributed); err != nil {
 			return err
 		}
 	}
