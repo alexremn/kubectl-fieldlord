@@ -45,13 +45,35 @@ software on its own.
 - *OpenAPI-schema-aware atomic/list-type labeling*: **moved to v0.3**.
   Not present in v0.2.
 
-## v0.3 — Hardening
+## v0.3 — Hardening ✅ DELIVERED
 
-- OpenAPI-schema-aware atomic/list-type labeling (moved from v0.2).
-- Performance and bounded iteration for very large objects (e.g. objects with
-  many `managedFields` entries or large `FieldsV1` blobs).
+- **`drift -f` — full desired-vs-live attributed diff.** Computes a typed
+  structured-merge-diff against the live object and attributes every changed
+  field to its owner in `managedFields`. Classifies findings as conflict,
+  self-change, addition, or degraded. Exit code `2` gates on conflicts when
+  `--expect-manager` is named.
+  - **Server-defaulting suppressed:** scrubs server-managed metadata/status
+    before diffing; intersects Removed paths with the manager's owned set so
+    apiserver-defaulted fields do not generate spurious conflicts.
+  - **Schema-aware paths:** uses OpenAPI v3 TypeConverter for merge-key paths
+    (`.spec.template.spec.containers[name="app"].image`); degrades gracefully
+    to containing-list granularity with a warning when no schema is available
+    (CRDs without a published schema).
+  - **Canonicalization residual (known):** values the apiserver normalizes on
+    admission (e.g. resource quantity `"1"` → `"1Gi"`) may appear as spurious
+    Modified conflicts. `predict` (server-authoritative) does not have this
+    issue. See [ADR-0003](docs/adr/0003-local-diff-is-schema-dependent.md).
+- OpenAPI-schema-aware atomic/list-type labeling for `explain` output: **not
+  yet delivered** — moved to backlog.
+- Performance and bounded iteration for very large objects: **not yet
+  delivered** — moved to backlog.
+
+## Backlog (post-v0.3)
+
+- OpenAPI-schema-aware atomic/list-type labeling for `explain` output.
+- Performance and bounded iteration for very large objects (many `managedFields`
+  entries or large `FieldsV1` blobs).
 - Per-entry-vs-served APIVersion mismatch surfacing.
-- Full desired-vs-live attributed diff (building on `predict`'s conflict set).
 
 ## Later
 

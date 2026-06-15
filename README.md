@@ -145,6 +145,139 @@ echo "Exit code: $?"
 # Exit code 2 if attributed drift is found; 0 if clean; 1 on error.
 ```
 
+### `drift -f` — manifest-attributed drift (offline)
+
+Compare a desired manifest against the live object and attribute every changed
+field to its owner in `managedFields`.
+
+```
+kubectl fieldlord drift <resource> -f <manifest> [--expect-manager <name>] [--include-status]
+```
+
+`-f` accepts a file path or `-` for stdin. Exactly one resource may be
+specified. The diff is computed entirely offline after the initial GET — no
+dry-run is issued.
+
+**Example:**
+
+```bash
+kubectl fieldlord drift deploy/api -f desired.yaml --expect-manager helm
+```
+
+Default table output:
+
+```
+FIELD                                                  EXPECTED   ACTUAL-MANAGER  OPERATION  CHANGE    ATTRIBUTED
+.spec.replicas                                         helm       keda-operator   Apply      Modified  conflict
+.spec.template.spec.containers[name="app"].image       helm       helm            Apply      Modified  self-change
+.spec.template.spec.containers[name="app"].resources   helm       -               -          Added     addition
+```
+
+**JSON output:**
+
+```bash
+kubectl fieldlord drift deploy/api -f desired.yaml --expect-manager helm -o json
+```
+
+```json
+{
+  "schemaVersion": "v1",
+  "command": "drift",
+  "resource": {
+    "group": "apps",
+    "version": "v1",
+    "kind": "Deployment",
+    "namespace": "default",
+    "name": "api"
+  },
+  "findings": [
+    {
+      "path": ".spec.replicas",
+      "actualOwner": {
+        "manager": "keda-operator",
+        "operation": "Apply",
+        "apiVersion": "apps/v1"
+      },
+      "change": "Modified",
+      "conflict": true
+    },
+    {
+      "path": ".spec.template.spec.containers[name=\"app\"].image",
+      "actualOwner": {
+        "manager": "helm",
+        "operation": "Apply",
+        "apiVersion": "apps/v1"
+      },
+      "change": "Modified",
+      "conflict": false
+    },
+    {
+      "path": ".spec.template.spec.containers[name=\"app\"].resources",
+      "change": "Added"
+    }
+  ],
+  "warnings": []
+}
+```
+
+`change`, `conflict`, and `granularity` are `omitempty` — they are absent in
+native drift output and only present in manifest mode.
+
+**Exit codes for `drift -f`:**
+
+| Code | Meaning |
+|------|---------|
+| `0`  | No conflicts. Self-changes, additions, and degraded findings do not gate exit 2. |
+| `1`  | Decode error, not-exactly-one-resource, or other runtime error. |
+| `2`  | At least one **conflict** (a Modified or Removed field owned by a manager other than `--expect-manager`). Only emitted when `--expect-manager` is named. |
+
+**Empty `--expect-manager` is informational.** Without a named baseline, every
+finding is classified as self-change, addition, or degraded — exit `2` is never
+produced. Manifest mode does not infer a primary applier.
+
+**`--include-status`** opts the `status` subresource into the diff. By default
+status fields are excluded from both sides before diffing.
+
+**Schema degradation (CRDs without a schema):** when the live cluster has no
+OpenAPI v3 schema for the resource type, the diff falls back to a deduced
+converter that treats lists as atomic. Affected paths are reported at
+containing-list granularity and labeled `granularity: "degraded"` in JSON output,
+with a warning. The paths are never wrong-keyed — they are coarser than ideal.
+
+**Canonicalization residual:** a value the author writes that the apiserver
+normalizes on admission (e.g. resource quantity `"1"` → `"1Gi"`) will appear as
+a Modified field and may be flagged as a conflict even though the author's intent
+is satisfied. This is a structural limitation of offline diffing. `predict` (which
+issues an actual SSA dry-run) does not have this issue.
+
+**Pointer to `predict`:** for the server-authoritative clobber set (exactly which
+fields a `--force-conflicts` apply would overwrite), use `predict`. `drift -f`
+and `predict` answer different questions and can legitimately return different
+results on the same resource — this is expected, not a bug. See
+[Three-way exit semantics](#three-way-exit-semantics).
+
+---
+
+### Three-way exit semantics
+
+Native `drift`, `drift -f`, and `predict` answer three distinct questions. They
+can legitimately differ on exit code for the same resource:
+
+| Tool | Question answered | Conflict definition | Schema needed |
+|------|------------------|---------------------|---------------|
+| `drift` (native) | Which live fields are owned by a manager I didn't expect? | Any field owned by a non-expected manager | No |
+| `drift -f` | Which desired-vs-live changes are owned by someone else? | Desired field Modified/Removed by a non-expected manager | Yes (degrades without) |
+| `predict` | Which fields would `--force-conflicts` overwrite? | apiserver-reported SSA conflict set | Yes (server-side) |
+
+A resource may show exit `2` from `predict` (a field your manager would
+force-take from another) while `drift -f` shows exit `0` (the desired and live
+values already match for that field, so no diff to attribute). Conversely,
+`drift -f` may show a conflict for a field the apiserver would not report in a
+dry-run, due to the canonicalization residual. Treat each tool's output as the
+answer to its own specific question.
+
+---
+
 ### `predict` — clobber predictor (SSA dry-run)
 
 Show which fields a `--force-conflicts` apply would clobber and who currently owns them.
@@ -226,9 +359,13 @@ kubectl fieldlord predict deploy/api -f desired.yaml --as-manager argocd-control
 
 | Code | Command | Meaning |
 |------|---------|---------|
-| `0`  | all | Success. No attributed drift (`drift`), no clobber conflicts (`predict`), or field ownership table (`explain`, always 0). |
-| `1`  | all | Runtime error: authentication failure, resource not found, unsupported server version, or "could not predict" (non-409 dry-run failure). |
-| `2`  | `drift`, `predict` | Diagnostic signal: attributed drift found (`drift`) or non-empty clobber set (`predict`). Use as CI gate. |
+| `0`  | all | Success. No attributed drift (`drift`/`drift -f`), no clobber conflicts (`predict`), or field ownership table (`explain`, always 0). |
+| `1`  | all | Runtime error: authentication failure, resource not found, decode error, cardinality error, unsupported server version, or "could not predict" (non-409 dry-run failure). |
+| `2`  | `drift`, `drift -f`, `predict` | Diagnostic signal: attributed drift found (`drift` native), conflict owned by another manager when `--expect-manager` is named (`drift -f`), or non-empty clobber set (`predict`). Use as CI gate. |
+
+`drift -f` without a named `--expect-manager` never produces exit `2` — the mode
+is informational. See [Three-way exit semantics](#three-way-exit-semantics) for
+when the three tools can legitimately disagree on the same resource.
 
 ---
 
