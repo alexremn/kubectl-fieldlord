@@ -2,15 +2,14 @@
 
 Make Kubernetes Server-Side Apply field ownership legible.
 
-> **Early release — v0.1.** This release ships `explain` and `drift`. The `predict` clobber-predictor (SSA dry-run) is coming in v0.2.
-
-`kubectl fieldlord` parses `managedFields` on any object and tells you who owns each field, and whether ownership has drifted from who you expect to be in charge. It is a read-only diagnostic tool that plugs into your existing `kubectl` workflow.
+`kubectl fieldlord` parses `managedFields` on any object and tells you who owns each field, whether ownership has drifted from who you expect to be in charge, and — with `predict` — exactly which fields a `--force-conflicts` apply would clobber before you run it. It plugs into your existing `kubectl` workflow.
 
 ---
 
 ## Safety & Privacy
 
-- **Read-only.** `explain` and `drift` only issue GET requests. They never modify your cluster.
+- **`explain` and `drift` are read-only.** They issue only GET requests and never modify your cluster.
+- **`predict` is a non-persisting dry-run.** It issues a Server-Side Apply with `DryRun:["All"]` and `Force:false` — no change is persisted. However, the dry-run does invoke server-side mutating and validating admission webhooks. Webhooks that declare `sideEffects: None` or `sideEffects: NoneOnDryRun` are safe. Webhooks lacking that declaration may have real side effects. Run `predict` against a non-production cluster first when your webhook posture is unknown.
 - **Talks only to your configured apiserver.** No data leaves your network. No telemetry, no analytics, no phone-home, no LLM.
 - **Respects your existing kubeconfig.** All standard kubectl config flags (`--context`, `--kubeconfig`, `-n/--namespace`, etc.) are honored.
 
@@ -34,7 +33,14 @@ kubectl fieldlord --version
 
 ### krew
 
-Krew distribution is planned for v0.2.
+Once v0.2.0 is published and the krew-index PR is accepted:
+
+```bash
+kubectl krew install fieldlord
+kubectl fieldlord --version
+```
+
+See [docs/krew-submission.md](docs/krew-submission.md) for the owner runbook.
 
 ---
 
@@ -139,15 +145,90 @@ echo "Exit code: $?"
 # Exit code 2 if attributed drift is found; 0 if clean; 1 on error.
 ```
 
+### `predict` — clobber predictor (SSA dry-run)
+
+Show which fields a `--force-conflicts` apply would clobber and who currently owns them.
+
+```
+kubectl fieldlord predict <resource> -f <manifest> --as-manager <name>
+```
+
+Both `-f` (file path or `-` for stdin) and `--as-manager` are required. Exactly one resource may be specified per invocation.
+
+`predict` issues a Server-Side Apply dry-run (`DryRun:["All"]`, `Force:false`) against the live object. The conflict set returned — the fields a `--force-conflicts` would overwrite — is the output. No change is persisted. See the [Safety & Privacy](#safety--privacy) section for webhook considerations.
+
+`predict` requires Kubernetes >= 1.22 (Server-Side Apply GA). It fast-fails with an error on older servers.
+
+**Example:**
+
+```bash
+kubectl fieldlord predict deploy/api -f desired.yaml --as-manager argocd-controller
+```
+
+Default table output:
+
+```
+FIELD                             CLOBBERS-MANAGER       OPERATION
+.spec.replicas                    helm-controller        Apply
+.spec.template.spec.containers    another-manager        Apply
+```
+
+**JSON output:**
+
+```bash
+kubectl fieldlord predict deploy/api -f desired.yaml --as-manager argocd-controller -o json
+```
+
+```json
+{
+  "schemaVersion": "v1",
+  "command": "predict",
+  "resource": {
+    "group": "apps",
+    "version": "v1",
+    "kind": "Deployment",
+    "namespace": "default",
+    "name": "api"
+  },
+  "findings": [
+    {
+      "path": ".spec.replicas",
+      "lowConfidence": false,
+      "currentOwner": {
+        "manager": "helm-controller",
+        "operation": "Apply",
+        "apiVersion": "apps/v1"
+      }
+    }
+  ]
+}
+```
+
+`lowConfidence: true` is set on servers affected by kubernetes/kubernetes#119141
+(~1.27 range) where the conflict set may be incomplete.
+
+**Warnings:**
+
+- If `--as-manager` owns no Apply-operation fields on the live object, `predict`
+  prints a warning (the result may still be useful).
+
+**Exit codes for `predict`:**
+
+| Code | Meaning |
+|------|---------|
+| `0`  | No conflicts — the apply would succeed without `--force-conflicts`. |
+| `1`  | Runtime error; OR the server returned a non-409 response (e.g. webhook dry-run failure, "could not predict"); OR Kubernetes < 1.22. |
+| `2`  | Non-empty clobber set — at least one field would be force-taken. Use this as your CI gate. |
+
 ---
 
 ## Exit codes
 
-| Code | Meaning |
-|------|---------|
-| `0`  | Success, no attributed drift (or `explain`, which always exits 0). |
-| `1`  | Runtime error: authentication failure, resource not found, cannot infer primary applier (no Apply-operation manager exists and `--expect-manager` was not passed), etc. |
-| `2`  | Attributed drift found (`drift` only). At least one field is owned by a manager other than the expected one. This is the CI-gate signal. |
+| Code | Command | Meaning |
+|------|---------|---------|
+| `0`  | all | Success. No attributed drift (`drift`), no clobber conflicts (`predict`), or field ownership table (`explain`, always 0). |
+| `1`  | all | Runtime error: authentication failure, resource not found, unsupported server version, or "could not predict" (non-409 dry-run failure). |
+| `2`  | `drift`, `predict` | Diagnostic signal: attributed drift found (`drift`) or non-empty clobber set (`predict`). Use as CI gate. |
 
 ---
 
