@@ -11,6 +11,25 @@ func mown(path, mgr string, op ownership.Operation) ownership.OwnedPath {
 	return ownership.OwnedPath{Path: path, Owners: []ownership.Owner{{Manager: mgr, Operation: op}}}
 }
 
+func TestManifest_CoOwnedWithExpectedNotConflict(t *testing.T) {
+	// A field co-owned by the expected manager AND another manager is a
+	// self-change, NOT a conflict (avoids a false-positive exit 2).
+	m := ownership.Model{Paths: []ownership.OwnedPath{{
+		Path: ".spec.replicas",
+		Owners: []ownership.Owner{
+			{Manager: "argo", Operation: ownership.OperationApply},
+			{Manager: "helm", Operation: ownership.OperationApply},
+		},
+	}}}
+	f := Manifest(nil, []string{".spec.replicas"}, nil, m, "helm", true)
+	if f[0].Conflict {
+		t.Errorf("field co-owned by the expected manager must not be a conflict: %+v", f[0])
+	}
+	if f[0].ActualOwner == nil || f[0].ActualOwner.Manager != "helm" {
+		t.Errorf("should attribute to the expected (co-)owner helm: %+v", f[0].ActualOwner)
+	}
+}
+
 func TestManifest_ConflictWhenModifiedOwnedByOther(t *testing.T) {
 	m := mdl(mown(".spec.replicas", "hpa", ownership.OperationUpdate))
 	f := Manifest(nil, []string{".spec.replicas"}, nil, m, "helm", true)

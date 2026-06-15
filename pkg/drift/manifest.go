@@ -30,31 +30,53 @@ func Manifest(added, modified, removed []string, model ownership.Model, expectMa
 
 func classify(path string, change Change, model ownership.Model, expectManager string, schemaUsed bool) Finding {
 	f := Finding{Path: path, Change: change, ExpectedManager: expectManager}
-	owner := mainOwnerOfPath(model, path)
-	if owner == nil {
+	owners := mainOwnersOfPath(model, path)
+	if len(owners) == 0 {
 		if !schemaUsed {
 			f.Granularity = "list" // coarse path that cannot join managedFields
 		}
 		return f
 	}
-	f.ActualOwner = owner
 	f.Attributed = true
-	if change != ChangeAdded && expectManager != "" && owner.Manager != expectManager {
+	// Prefer the expected manager when it (co-)owns the path: a field the expected
+	// manager owns, even jointly with others, is a self-change — not a conflict.
+	if expectManager != "" {
+		if o := findOwner(owners, expectManager); o != nil {
+			f.ActualOwner = o
+			return f
+		}
+	}
+	o := owners[0]
+	f.ActualOwner = &o
+	// Changed and owned only by manager(s) other than the named baseline.
+	if change != ChangeAdded && expectManager != "" {
 		f.Conflict = true
 	}
 	return f
 }
 
-func mainOwnerOfPath(model ownership.Model, path string) *ownership.Owner {
+// mainOwnersOfPath returns the main-resource (Subresource=="") owners of path.
+func mainOwnersOfPath(model ownership.Model, path string) []ownership.Owner {
 	for _, p := range model.Paths {
 		if p.Path != path {
 			continue
 		}
+		var out []ownership.Owner
 		for _, o := range p.Owners {
 			if o.Subresource == "" {
-				oo := o
-				return &oo
+				out = append(out, o)
 			}
+		}
+		return out
+	}
+	return nil
+}
+
+func findOwner(owners []ownership.Owner, manager string) *ownership.Owner {
+	for _, o := range owners {
+		if o.Manager == manager {
+			oo := o
+			return &oo
 		}
 	}
 	return nil
