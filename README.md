@@ -168,10 +168,15 @@ Default table output:
 
 ```
 FIELD                                                  EXPECTED   ACTUAL-MANAGER  OPERATION  CHANGE    ATTRIBUTED
-.spec.replicas                                         helm       keda-operator   Apply      Modified  conflict
-.spec.template.spec.containers[name="app"].image       helm       helm            Apply      Modified  self-change
-.spec.template.spec.containers[name="app"].resources   helm       -               -          Added     addition
+.spec.replicas                                         helm       keda-operator   Update     modified  true
+.spec.template.spec.containers[name="app"].image       helm       helm            Apply      modified  true
+.spec.template.spec.containers[name="app"].resources   helm                                  added     false
 ```
+
+The table's `ATTRIBUTED` column is a bool; the per-field **conflict** flag (which
+gates exit 2) is exposed in `-o json` (below). Here `.spec.replicas` is a conflict
+(owned by `keda-operator`, not `helm`), the image is a self-change (owned by `helm`),
+and `.spec…resources` is an unattributed addition.
 
 **JSON output:**
 
@@ -193,27 +198,32 @@ kubectl fieldlord drift deploy/api -f desired.yaml --expect-manager helm -o json
   "findings": [
     {
       "path": ".spec.replicas",
+      "expectedManager": "helm",
+      "attributed": true,
       "actualOwner": {
         "manager": "keda-operator",
-        "operation": "Apply",
-        "apiVersion": "apps/v1"
+        "operation": "Update",
+        "apiVersion": "autoscaling/v2"
       },
-      "change": "Modified",
+      "change": "modified",
       "conflict": true
     },
     {
       "path": ".spec.template.spec.containers[name=\"app\"].image",
+      "expectedManager": "helm",
+      "attributed": true,
       "actualOwner": {
         "manager": "helm",
         "operation": "Apply",
         "apiVersion": "apps/v1"
       },
-      "change": "Modified",
-      "conflict": false
+      "change": "modified"
     },
     {
       "path": ".spec.template.spec.containers[name=\"app\"].resources",
-      "change": "Added"
+      "expectedManager": "helm",
+      "attributed": false,
+      "change": "added"
     }
   ],
   "warnings": []
@@ -241,7 +251,7 @@ status fields are excluded from both sides before diffing.
 **Schema degradation (CRDs without a schema):** when the live cluster has no
 OpenAPI v3 schema for the resource type, the diff falls back to a deduced
 converter that treats lists as atomic. Affected paths are reported at
-containing-list granularity and labeled `granularity: "degraded"` in JSON output,
+containing-list granularity and labeled `granularity: "list"` in JSON output,
 with a warning. The paths are never wrong-keyed — they are coarser than ideal.
 
 **Canonicalization residual:** a value the author writes that the apiserver

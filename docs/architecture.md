@@ -94,7 +94,7 @@ parseable by `jq` and `encoding/json`.
 `pkg/drift/typeconv.go` builds a `typed.TypeConverter` from the OpenAPI v3
 schema fetched at startup. When no schema is available for the type (CRDs
 without a published schema), it falls back to a deduced converter; affected
-paths are flagged `granularity: "degraded"` in output.
+paths are flagged `granularity: "list"` in output.
 
 **Key dependency:** `sigs.k8s.io/structured-merge-diff/v6/typed` — the `typed`
 sub-package (not just `fieldpath`) is now used directly for diff computation.
@@ -104,9 +104,9 @@ import is already a transitive dependency of client-go. See
 known limitations.
 
 The `drift -f` JSON envelope extends the base envelope with per-finding fields:
-`change` (Added/Modified/Removed), `conflict` (bool), `actualOwner`
+`change` (`modified`/`added`/`removed`), `conflict` (bool), `actualOwner`
 `{manager, operation, apiVersion, time, subresource}`, and `granularity`
-("degraded") — all `omitempty`, absent in native drift output.
+(`"list"` when degraded) — all `omitempty`, absent in native drift output.
 
 ## FieldsV1 decoding
 

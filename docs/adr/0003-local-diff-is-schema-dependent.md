@@ -67,7 +67,7 @@ When no schema is available for a type (CRDs that do not publish a schema, or
 off-line use), fall back to a deduced converter. The deduced converter treats all
 lists as atomic — no merge keys — so paths are coarser (the containing list, not
 the individual entry), but they are never wrong-keyed. This degradation is
-labeled explicitly in output with `granularity: "degraded"` and a warning.
+labeled explicitly in output with `granularity: "list"` and a warning.
 
 ### live.Compare(desired) direction
 
@@ -126,7 +126,7 @@ meaningless against `managedFields` and misleading to the user.
 - Server-defaulting noise is suppressed without hiding real conflicts (the
   asymmetric intersection rule).
 - Degradation is explicit and honest: CRD fields without a schema produce
-  coarse paths labeled `granularity: "degraded"`, never silently wrong paths.
+  coarse paths labeled `granularity: "list"`, never silently wrong paths.
 
 ### Known residual: apiserver canonicalization
 
