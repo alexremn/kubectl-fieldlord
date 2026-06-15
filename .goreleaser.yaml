@@ -1,0 +1,84 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: kubectl-fieldlord
+    main: ./cmd/kubectl-fieldlord
+    binary: kubectl-fieldlord
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    mod_timestamp: '{{ .CommitTimestamp }}'
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w
+      - -X github.com/alexremn/kubectl-fieldlord/internal/buildinfo.Version={{ .Version }}
+      - -X github.com/alexremn/kubectl-fieldlord/internal/buildinfo.Commit={{ .Commit }}
+      - -X github.com/alexremn/kubectl-fieldlord/internal/buildinfo.Date={{ .CommitDate }}
+
+archives:
+  - id: archives
+    formats: [tar.gz]
+    name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - LICENSE
+      - NOTICE
+      - README.md
+      - THIRD_PARTY_LICENSES
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+sboms:
+  - id: spdx
+    artifacts: archive
+    args: ['$artifact', '--output', 'spdx-json=$document']
+    documents: ['${artifact}.spdx.sbom.json']
+  - id: cdx
+    artifacts: archive
+    args: ['$artifact', '--output', 'cyclonedx-json=$document']
+    documents: ['${artifact}.cdx.sbom.json']
+
+signs:
+  - cmd: cosign
+    artifacts: checksum
+    signature: '${artifact}.sigstore.json'
+    args: ['sign-blob', '--yes', '--bundle=${signature}', '${artifact}']
+    output: true
+
+krews:
+  - name: fieldlord
+    ids: [archives]
+    homepage: https://github.com/alexremn/kubectl-fieldlord
+    short_description: Explain Server-Side Apply field ownership and drift
+    description: |
+      Parse managedFields to explain per-field ownership, attribute drift to a
+      fieldManager, and predict what --force-conflicts would clobber.
+    repository:
+      owner: alexremn
+      name: krew-index
+      branch: kubectl-fieldlord-{{ .Version }}
+      token: '{{ .Env.KREW_INDEX_TOKEN }}'
+      pull_request:
+        enabled: true
+        base:
+          owner: kubernetes-sigs
+          name: krew-index
+          branch: master
+    skip_upload: auto
+
+release:
+  prerelease: auto
+
+changelog:
+  use: github
+  sort: asc
