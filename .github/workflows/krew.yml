@@ -12,4 +12,4 @@ jobs:
       # Reads .krew.yaml, fills version + per-archive sha256 from the published
       # release, and opens a PR to kubernetes-sigs/krew-index (first submission +
       # every subsequent update). No fork or extra token required.
-      - uses: rajatjindal/krew-release-bot@v0.0.47
+      - uses: rajatjindal/krew-release-bot@v0.0.51
