@@ -18,7 +18,13 @@ jobs:
     # it starts running automatically once the repo is public.
     if: ${{ github.event.repository.private == false }}
     steps:
+      # Diff-informed analysis (default in codeql-action v4) fetches the PR base
+      # ref to compute changed-line ranges. A shallow clone breaks that fetch
+      # ("error processing shallow info"), so the action emits `undefined` ranges
+      # and the run fails. Full history makes the base diff resolvable.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - uses: actions/setup-go@v6
         with:
           go-version: '1.26'
