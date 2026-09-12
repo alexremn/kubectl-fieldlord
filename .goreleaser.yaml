@@ -102,7 +102,7 @@ release:
     ```sh
     # Homebrew
     brew install alexremn/tap/kubectl-fieldlord
-    # krew (once accepted into krew-index)
+    # krew
     kubectl krew install fieldlord
     ```
     Or grab a static binary from the assets below (rename to `kubectl-fieldlord`, put on `PATH`).
