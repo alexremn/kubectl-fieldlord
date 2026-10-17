@@ -542,7 +542,7 @@ func waitForCRD(ctx context.Context, dyn dynamic.Interface, gvr schema.GroupVers
 func boolPtr(b bool) *bool { return &b }
 
 func managedFieldManagers(entries []metav1.ManagedFieldsEntry) []string {
-	var mgrs []string
+	mgrs := make([]string, 0, len(entries))
 	for _, e := range entries {
 		mgrs = append(mgrs, e.Manager)
 	}
