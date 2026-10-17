@@ -2,7 +2,10 @@
 package drift
 
 import (
+	"cmp"
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 
 	"github.com/alexremn/kubectl-fieldlord/pkg/ownership"
@@ -109,27 +112,13 @@ func inferPrimary(m ownership.Model) (string, bool) {
 	if len(stats) == 0 {
 		return "", false
 	}
-	best := ""
-	for mgr, s := range stats {
-		if best == "" {
-			best = mgr
-			continue
-		}
-		b := stats[best]
-		switch {
-		case s.count != b.count:
-			if s.count > b.count {
-				best = mgr
-			}
-		case s.latest != b.latest:
-			if s.latest > b.latest {
-				best = mgr
-			}
-		default:
-			if mgr < best {
-				best = mgr
-			}
-		}
-	}
-	return best, true
+	// Names are unique map keys, so this order is total and the pick is
+	// independent of map iteration order.
+	return slices.MinFunc(slices.Collect(maps.Keys(stats)), func(a, b string) int {
+		return cmp.Or(
+			cmp.Compare(stats[b].count, stats[a].count),   // most leaves first
+			cmp.Compare(stats[b].latest, stats[a].latest), // then most recent
+			cmp.Compare(a, b), // then name
+		)
+	}), true
 }
