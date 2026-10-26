@@ -25,9 +25,9 @@ type ConflictPath struct {
 }
 
 // Probe issues a non-force Server-Side Apply under DryRun:["All"] as fieldManager
-// and returns the conflict set. No conflict -> (nil, nil). Non-409 errors (RBAC,
-// network, webhook dry-run failure) propagate so the caller can report
-// "could not predict" rather than "no conflicts".
+// and returns the conflict set. No conflict -> (nil, nil). Any other error (RBAC,
+// network, webhook dry-run failure, a 409 that is not a field-manager conflict)
+// propagates so the caller can report "could not predict" rather than "no conflicts".
 func Probe(ctx context.Context, ri dynamic.ResourceInterface, name string, data []byte, fieldManager string) ([]ConflictPath, error) {
 	_, err := ri.Patch(ctx, name, types.ApplyPatchType, data, metav1.PatchOptions{
 		FieldManager: fieldManager,
@@ -48,16 +48,20 @@ func extractConflicts(err error) ([]ConflictPath, error) {
 	if !errors.As(err, &se) {
 		return nil, err
 	}
-	st := se.Status()
-	if st.Details == nil {
-		return nil, nil
-	}
 	var out []ConflictPath
-	for _, c := range st.Details.Causes {
-		if c.Type != metav1.CauseTypeFieldManagerConflict {
-			continue
+	if d := se.Status().Details; d != nil {
+		for _, c := range d.Causes {
+			if c.Type != metav1.CauseTypeFieldManagerConflict {
+				continue
+			}
+			out = append(out, ConflictPath{Field: c.Field, Manager: parseManager(c.Message)})
 		}
-		out = append(out, ConflictPath{Field: c.Field, Manager: parseManager(c.Message)})
+	}
+	// A 409 with no field-manager causes is not an ownership conflict (e.g. a
+	// stale metadata.resourceVersion): the apply would fail outright, so an empty
+	// set here would be a false all-clear.
+	if len(out) == 0 {
+		return nil, err
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Field != out[j].Field {

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -156,6 +157,39 @@ func TestEnvtest_Predict(t *testing.T) {
 		_, err = predict.Probe(ctx, nsRI, "scoped-demo", desiredData, "mgr-b")
 		if err != nil {
 			t.Errorf("predict.Probe (cluster-scoped) returned unexpected error: %v", err)
+		}
+	})
+
+	t.Run("stale_resource_version_is_error", func(t *testing.T) {
+		depRI := dyn.Resource(deployGVR).Namespace("default")
+		data, err := deploymentApplyConfig("stale-rv", "default", 3)
+		if err != nil {
+			t.Fatalf("build apply config: %v", err)
+		}
+		if err := applySSA(ctx, depRI, "stale-rv", data, "mgr-a"); err != nil {
+			t.Fatalf("setup apply as mgr-a: %v", err)
+		}
+
+		// Same manager, same values (no field conflict), but a stale
+		// resourceVersion — e.g. a manifest exported via `kubectl get -o yaml`.
+		// The apiserver rejects the apply with a cause-less 409; Probe must
+		// surface it instead of reporting an empty (all-clear) conflict set.
+		var obj map[string]interface{}
+		if err := json.Unmarshal(data, &obj); err != nil {
+			t.Fatal(err)
+		}
+		obj["metadata"].(map[string]interface{})["resourceVersion"] = "1"
+		stale, err := json.Marshal(obj)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		conflicts, err := predict.Probe(ctx, depRI, "stale-rv", stale, "mgr-a")
+		if err == nil {
+			t.Fatalf("stale resourceVersion: want error, got conflicts=%+v", conflicts)
+		}
+		if !apierrors.IsConflict(err) {
+			t.Errorf("want 409 Conflict, got %v", err)
 		}
 	})
 }
