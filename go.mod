@@ -3,7 +3,7 @@ module github.com/alexremn/kubectl-fieldlord
 go 1.26.0
 
 require (
-	github.com/go-logr/logr v1.4.3
+	github.com/go-logr/logr v1.4.4
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/term v0.47.0
 	k8s.io/api v0.37.1
