@@ -20,7 +20,7 @@ Pull requests that contain unsigned commits will not be merged.
 
 ### Prerequisites
 
-- Go 1.26 or later (required by the pinned k8s.io v0.36 dependencies)
+- Go 1.26 or later (required by the pinned k8s.io v0.37 dependencies)
 - [golangci-lint](https://golangci-lint.run/) v2 (`brew install golangci-lint` or see upstream install docs)
 - `setup-envtest` for the integration test lane (see below)
 
@@ -93,7 +93,7 @@ The `test/integration/` lane runs against a real Kubernetes API server managed b
      go test -tags integration ./test/integration/
    ```
 
-The integration tests require the `integration` build tag and are not run by `make test`. Run them before submitting changes that touch `pkg/kube`, `pkg/ownership`, or `pkg/cmd`.
+The integration tests require the `integration` build tag and are not run by `make test`. Run them before submitting changes that touch `pkg/kube`, `pkg/ownership`, or `pkg/cmd`. CI runs this lane on every pull request (and before every release) against Kubernetes 1.34.1 and 1.37.0.
 
 ---
 

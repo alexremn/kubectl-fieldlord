@@ -24,6 +24,9 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version: '1.26'
+          # Ship with the newest 1.26.x patch (stdlib security fixes), not
+          # whatever version the runner happens to cache.
+          check-latest: true
       - name: Generate third-party licenses
         run: make third-party-licenses
       - uses: sigstore/cosign-installer@v4.1.2

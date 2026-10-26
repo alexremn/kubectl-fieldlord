@@ -18,6 +18,23 @@ jobs:
           pct=$(go tool cover -func=coverage.txt | awk '/^total:/ {gsub("%","",$3); print $3}')
           echo "coverage: $pct%"
           awk "BEGIN{exit !($pct >= 80.0)}" || (echo "coverage below 80%" && exit 1)
+  # envtest lane: a real kube-apiserver + etcd. Catches dependency bumps
+  # (client-go, apimachinery, structured-merge-diff, controller-runtime) that
+  # unit tests cannot see.
+  integration:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        k8s: ['1.34.1', '1.37.0'] # documented floor, newest envtest release
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with: { go-version: '1.26', check-latest: true }
+      # Same version as go.mod's controller-runtime, so dependabot bumps move it.
+      - run: go install sigs.k8s.io/controller-runtime/tools/setup-envtest@"$(go list -m -f '{{ .Version }}' sigs.k8s.io/controller-runtime)"
+      - run: KUBEBUILDER_ASSETS="$(setup-envtest use "$K8S" -p path)" go test -race -count=1 -tags integration ./test/integration/
+        env: { K8S: '${{ matrix.k8s }}' }
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -25,4 +42,4 @@ jobs:
       - uses: actions/setup-go@v7
         with: { go-version: '1.26' }
       - uses: golangci/golangci-lint-action@v9
-        with: { version: v2.12.2 }
+        with: { version: v2.12.2, args: --build-tags integration }
